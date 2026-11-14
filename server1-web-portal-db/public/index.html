@@ -1,0 +1,2163 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#f2f5f7] text-slate-800">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SipMyNumber | Enterprise WebRTC CRM & Softphone</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- JsSIP Local Bundle -->
+  <script src="/jssip.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            suite: {
+              header: '#24333c',
+              headerdark: '#1c2830',
+              sidebar: '#366877',
+              sidebardark: '#2d5764',
+              sidebaractive: '#244853',
+              green: '#28b67a',
+              greenlight: '#8ae088',
+              greendark: '#1f9260',
+              tableheader: '#3b5a69',
+              tablerow: '#ffffff',
+              tablestripe: '#f8fafb',
+              tableborder: '#dbe5ea',
+              phoneblue: '#1d68d8',
+              accountcoral: '#d9534f',
+              bg: '#f2f5f7',
+              textdark: '#212529',
+              textmuted: '#6c757d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* SuiteCRM Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #e8eff3; }
+    ::-webkit-scrollbar-thumb { background: #366877; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #24333c; }
+
+    .suite-tab-active {
+      background-color: transparent !important;
+      color: #8ae088 !important;
+      border-bottom: 3px solid #8ae088 !important;
+    }
+    .dial-btn {
+      transition: all 0.1s ease-in-out;
+      user-select: none;
+    }
+    .dial-btn:active {
+      transform: scale(0.94);
+      background-color: #28b67a !important;
+      color: #ffffff !important;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.96); opacity: 0.9; }
+      50% { transform: scale(1.08); opacity: 0.4; }
+      100% { transform: scale(0.96); opacity: 0.9; }
+    }
+    .ring-active {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+    .dotted-link {
+      border-bottom: 1px dotted #d9534f;
+      color: #d9534f;
+    }
+    .dotted-link:hover {
+      color: #b52b27;
+      border-bottom-color: #b52b27;
+    }
+  </style>
+  <meta name="theme-color" content="#1c2830">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body class="h-full flex flex-col font-sans bg-[#f2f5f7] text-slate-800 antialiased">
+
+  <!-- Audio Elements for 2-Way WebRTC Audio -->
+  <audio id="remoteAudio" autoplay playsinline></audio>
+  <audio id="ringtoneAudio" loop></audio>
+
+  <!-- ============================================================== -->
+  <!-- SUITECRM TOP NAVIGATION HEADER BAR (Dark Slate #24333c) -->
+  <!-- ============================================================== -->
+  <!-- ============================================================== -->
+  <!-- TOP NAVIGATION HEADER BAR (SuiteCRM Dark Slate #24333c)        -->
+  <!-- ============================================================== -->
+  <header class="bg-[#24333c] text-white border-b border-[#1c2830] sticky top-0 z-40 shadow-md">
+    <div class="w-full px-3 sm:px-6 h-14 flex items-center justify-between gap-3">
+      
+      <!-- Left: Logo (Clicking switches to home view without reload or logout) -->
+      <a href="#" onclick="handleLogoClick(event); return false;" class="flex items-center space-x-2.5 pr-4 border-r border-slate-700/60 hover:opacity-90 transition-opacity shrink-0 cursor-pointer" title="Go to Dashboard">
+        <div class="w-8 h-8 rounded bg-[#28b67a] flex items-center justify-center text-white shadow-sm font-bold text-sm">
+          <i class="fa-solid fa-phone"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
+            Sip<span class="text-[#8ae088]">MyNumber</span>
+          </span>
+          <span class="text-[9px] uppercase font-semibold tracking-wider text-slate-400 -mt-0.5">Telecom CRM</span>
+        </div>
+      </a>
+
+      <!-- Center: Universal Global Search Bar (Customer ID, DID, Customer Name, Extension) -->
+      <div id="headerSearchContainer" class="hidden md:flex flex-1 max-w-xl mx-2 sm:mx-4 relative">
+        <div class="relative w-full flex items-center">
+          <input type="text" id="globalHeaderSearch" oninput="handleHeaderSearchInput(event)" onkeydown="if(event.key==='Enter') executeGlobalSearch(event)" placeholder="?? Search Customer ID, DID (+1...), Name, UID..." 
+                 class="w-full bg-[#1c2830] text-xs text-white placeholder-slate-400 pl-9 pr-24 py-2 rounded border border-slate-700 focus:outline-none focus:border-[#8ae088] transition-colors shadow-inner font-medium">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs pointer-events-none"></i>
+          <button type="button" onclick="executeGlobalSearch(event)" class="absolute right-1 px-3 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow transition-colors flex items-center gap-1">
+            <span>Search</span>
+          </button>
+        </div>
+        <!-- Global Search Results Dropdown -->
+        <div id="globalSearchResultsDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white text-slate-800 border border-slate-300 rounded shadow-2xl p-2 z-50 max-h-96 overflow-y-auto">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Right: User Controls & Notifications -->
+      <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+        <div id="navbarUserBar" class="hidden flex items-center space-x-2 sm:space-x-3">
+          <!-- Admin Pending Top-ups Alert Pill -->
+          <button id="adminPendingAlertBtn" onclick="switchTab('admin'); switchAdminSubtab('requests');" class="hidden px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 transition-all animate-pulse" title="Click to Review Pending Top-up Requests">
+            <i class="fa-solid fa-bell"></i>
+            <span><span id="adminPendingHeaderCount">0</span> Pending Top-ups</span>
+          </button>
+
+          <!-- Open Customer Mobile Portal -->
+          <a href="/mobile/" target="_blank" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#209462] text-white font-bold text-xs shadow flex items-center gap-1.5 transition-all" title="Open Customer Mobile App">
+            <i class="fa-solid fa-mobile-screen"></i>
+            <span class="hidden sm:inline">Customer Mobile</span>
+          </a>
+
+          <!-- Download Android APK Button -->
+          <a href="/downloads/SipMyNumber.apk" download="SipMyNumber.apk" class="px-2.5 py-1 rounded bg-[#24333c] hover:bg-[#1a252c] text-[#8ae088] border border-slate-700 font-bold text-xs shadow flex items-center gap-1.5 transition-all" title="Download SipMyNumber Android APK">
+            <i class="fa-brands fa-android text-emerald-400"></i>
+            <span class="hidden sm:inline">Android APK</span>
+          </a>
+
+          <!-- User Profile Display & Sign Out -->
+          <div class="flex items-center space-x-2 bg-[#1c2830] px-3 py-1.5 rounded border border-slate-700 text-xs">
+            <div id="userAvatar" class="w-6 h-6 rounded bg-[#366877] text-white flex items-center justify-center font-bold text-xs border border-slate-600">
+              U
+            </div>
+            <span id="userNameText" class="font-bold text-white max-w-[120px] truncate">User</span>
+            <span id="userRoleBadge" class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-slate-700 text-slate-300">User</span>
+          </div>
+
+          <button onclick="handleLogout()" title="Sign Out of Portal" class="p-2 text-slate-300 hover:text-rose-400 hover:bg-[#1c2830] rounded transition-colors">
+            <i class="fa-solid fa-power-off text-sm"></i>
+          </button>
+        </div>
+
+        <div id="navbarGuestBar" class="flex items-center space-x-2 text-xs text-slate-300">
+          <i class="fa-solid fa-shield-halved text-[#8ae088]"></i>
+          <span class="font-semibold">SipMyNumber Enterprise</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- 1. UNAUTHENTICATED VIEW: PROFESSIONAL SUITECRM SIGN IN / UP -->
+  <!-- ============================================================== -->
+  <section id="authView" class="flex-1 flex items-center justify-center p-4 sm:p-6 bg-[#1e2b37]">
+    <div class="max-w-md w-full bg-white border border-slate-300 rounded shadow-2xl overflow-hidden">
+      
+      <!-- Card Top Brand Banner -->
+      <div class="bg-[#24333c] p-6 text-center border-b border-[#1c2830]">
+        <div class="w-14 h-14 mx-auto rounded bg-[#28b67a] flex items-center justify-center shadow text-white font-bold text-2xl mb-3">
+          <i class="fa-solid fa-phone"></i>
+        </div>
+        <h2 id="authCardTitle" class="text-2xl font-black tracking-tight text-white">Sign In to Sip<span class="text-[#8ae088]">MyNumber</span></h2>
+        <p id="authCardSubtitle" class="text-xs text-slate-300 mt-1">Enterprise WebRTC Softphone & Customer Management Portal</p>
+      </div>
+
+      <!-- Auth Form Container -->
+      <div class="p-6 sm:p-8">
+        
+        <!-- Toggle Switch (SuiteCRM Slate / Green Accent) -->
+        <div class="grid grid-cols-2 p-1 mb-6 rounded bg-[#f2f5f7] border border-slate-300">
+          <button type="button" onclick="setAuthMode('login')" id="authTabLogin" class="py-2 rounded text-xs font-bold transition-all bg-[#28b67a] text-white shadow-sm">
+            Sign In
+          </button>
+          <button type="button" onclick="setAuthMode('register')" id="authTabRegister" class="py-2 rounded text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">
+            Create Account
+          </button>
+        </div>
+
+        <!-- Auth Form -->
+        <form id="authMainForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+          
+          <!-- Full Name (Only on Sign Up) -->
+          <div id="authFieldFullName" class="hidden">
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Full Name</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-user text-xs"></i></span>
+              <input type="text" id="inputFullName" placeholder="e.g. Marcelo Horn" class="w-full pl-9 pr-3 py-2 rounded border border-slate-300 bg-white text-slate-900 text-sm focus:border-[#28b67a] focus:ring-1 focus:ring-[#28b67a] focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Email Address -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Email Address</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-envelope text-xs"></i></span>
+              <input type="email" id="inputEmail" required placeholder="user@example.com" class="w-full pl-9 pr-3 py-2 rounded border border-slate-300 bg-white text-slate-900 text-sm focus:border-[#28b67a] focus:ring-1 focus:ring-[#28b67a] focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Password</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-lock text-xs"></i></span>
+              <input type="password" id="inputPassword" required placeholder="••••••••" class="w-full pl-9 pr-3 py-2 rounded border border-slate-300 bg-white text-slate-900 text-sm focus:border-[#28b67a] focus:ring-1 focus:ring-[#28b67a] focus:outline-none">
+            </div>
+            <p id="passwordHint" class="hidden text-[11px] text-slate-500 mt-1">
+              🔒 Auto-provisions your SIP account (UID) on Asterisk 20 with this password.
+            </p>
+          </div>
+
+          <!-- Error Alert -->
+          <div id="authAlertError" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-200 p-3 rounded flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="authAlertText">Error message</span>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="authSubmitButton" class="w-full py-2.5 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-sm shadow flex items-center justify-center space-x-2 transition-colors">
+            <i id="authSubmitIcon" class="fa-solid fa-arrow-right-to-bracket"></i>
+            <span id="authSubmitLabel">Sign In</span>
+          </button>
+        </form>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 text-center text-[11px] text-slate-500">
+          SuiteCRM Architecture • WebRTC Audio DTLS-SRTP • Single Sign-On
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- 2. AUTHENTICATED WORKSPACE (SuiteCRM Sidebar + Main Content) -->
+  <!-- ============================================================== -->
+  <div id="dashboardView" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden">
+    
+    <!-- ============================================================== -->
+    <!-- LEFT SIDEBAR: SUITECRM ACTIONS & SHORTCUTS (#366877) -->
+    <!-- ============================================================== -->
+    <!-- ============================================================== -->
+    <!-- LEFT SIDEBAR: ACCOUNT INFORMATION & CRM NAVIGATION             -->
+    <!-- ============================================================== -->
+    <aside id="crmSidebar" class="w-full md:w-64 bg-[#366877] text-white border-r border-[#2d5764] flex flex-col justify-between shrink-0 shadow-md overflow-y-auto">
+      <div class="p-4 space-y-4">
+        
+        <!-- Account Profile Card in Sidebar -->
+        <div class="bg-[#2a535f] p-3.5 rounded border border-[#3b7180] shadow-sm space-y-2.5">
+          <div class="flex items-center space-x-2.5">
+            <div id="sidebarUserAvatar" class="w-9 h-9 rounded-full bg-[#1c2830] border border-slate-500 flex items-center justify-center font-bold text-sm text-[#8ae088]">
+              U
+            </div>
+            <div class="overflow-hidden flex-1">
+              <div id="sidebarUserName" class="font-bold text-white text-xs truncate">User Name</div>
+              <div id="sidebarRolePill" class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                CUSTOMER
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer Specific Status: Line & Balance -->
+          <div id="sidebarCustomerInfo" class="space-y-1.5 pt-2 border-t border-[#3b7180]/60 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-300">User ID (UID):</span>
+              <span class="font-mono font-bold text-[#8ae088] flex items-center gap-1">
+                <span id="sidebarWebrtcDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span id="sidebarExtDisplay">UID --</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-300">Wallet Balance:</span>
+              <span class="font-mono font-bold text-white" id="sidebarBalDisplay">$0.00</span>
+            </div>
+            <button type="button" onclick="openTopupModal(event)" class="w-full mt-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow transition-colors">
+              <i class="fa-solid fa-plus-circle text-xs"></i>
+              <span>+ Add Balance / Top-up</span>
+            </button>
+          </div>
+
+          <!-- Admin Specific Status (No WebPhone line, pure CRM management) -->
+          <div id="sidebarAdminInfo" class="hidden space-y-1 pt-2 border-t border-[#3b7180]/60 text-xs">
+            <div class="flex items-center justify-between text-slate-300">
+              <span>Management Mode:</span>
+              <span class="font-bold text-purple-300">Super Admin</span>
+            </div>
+            <div class="flex items-center justify-between text-slate-300">
+              <span>Control Level:</span>
+              <span class="text-emerald-400 font-semibold">Full CRM Access</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. CUSTOMER NAVIGATION (Shown when user is regular customer) -->
+        <div id="customerSidebarNav" class="space-y-1">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-300 mb-2 flex items-center justify-between px-1">
+            <span>Customer Services</span>
+            <i class="fa-solid fa-phone text-[#8ae088]"></i>
+          </div>
+          <button onclick="switchTab('dialer')" id="sideNav-dialer" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-phone text-[#8ae088]"></i><span>Dialer / Softphone</span></span>
+          </button>
+          <button onclick="switchTab('marketplace')" id="sideNav-marketplace" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-cart-shopping text-[#8ae088]"></i><span>Buy Phone Numbers</span></span>
+          </button>
+          <button onclick="switchTab('routes')" id="sideNav-routes" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-route text-[#8ae088]"></i><span>DID Forwarding</span></span>
+          </button>
+          <button onclick="switchTab('voicemails')" id="sideNav-voicemails" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-voicemail text-[#8ae088]"></i><span>Voicemails</span></span>
+            <span id="unreadVoicemailBadge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-black font-bold">0</span>
+          </button>
+          <button onclick="switchTab('rates')" id="sideNav-rates" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-calculator text-[#8ae088]"></i><span>Call Rates</span></span>
+          </button>
+          <button onclick="switchTab('cdrs')" id="sideNav-cdrs" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-list-check text-[#8ae088]"></i><span>Call History</span></span>
+          </button>
+        </div>
+
+        <!-- 2. ADMIN NAVIGATION (Shown when user is ADMIN: PURE CRM MANAGEMENT, NO DIALER/VOICEMAIL) -->
+        <div id="adminSidebarNav" class="hidden space-y-1">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-purple-200 mb-2 flex items-center justify-between px-1">
+            <span>CRM Administration</span>
+            <i class="fa-solid fa-shield-halved text-purple-300"></i>
+          </div>
+          <button onclick="switchTab('admin'); switchAdminSubtab('users');" id="sideNav-admin-users" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center space-x-2 transition-colors">
+            <i class="fa-solid fa-users text-[#8ae088]"></i>
+            <span>Customers & UIDs</span>
+          </button>
+          <button onclick="switchTab('admin'); switchAdminSubtab('requests');" id="sideNav-admin-requests" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center justify-between transition-colors">
+            <span class="flex items-center space-x-2"><i class="fa-solid fa-money-bill-transfer text-emerald-400"></i><span>Top-up Requests</span></span>
+            <span id="adminPendingRequestsBadge" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-black font-bold">0</span>
+          </button>
+          <button onclick="switchTab('admin'); switchAdminSubtab('dids');" id="sideNav-admin-dids" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center space-x-2 transition-colors">
+            <i class="fa-solid fa-globe text-blue-400"></i>
+            <span>DID Numbers & Routing</span>
+          </button>
+          <button onclick="switchTab('admin'); switchAdminSubtab('ledger');" id="sideNav-admin-ledger" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center space-x-2 transition-colors">
+            <i class="fa-solid fa-receipt text-emerald-400"></i>
+            <span>Financial Statements / Ledger</span>
+          </button>
+          <button onclick="switchTab('admin'); switchAdminSubtab('rates');" id="sideNav-admin-rates" class="w-full text-left px-3 py-2 rounded bg-[#2f5b68] hover:bg-[#244853] text-xs font-semibold flex items-center space-x-2 transition-colors">
+            <i class="fa-solid fa-hand-holding-dollar text-indigo-300"></i>
+            <span>Destination Call Rates</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Download Android App Button -->
+      <div class="px-3 pt-2.5 pb-2 bg-[#244853] border-t border-[#2d5764]">
+        <a href="/downloads/SipMyNumber.apk" download="SipMyNumber.apk" class="w-full py-1.5 px-2.5 rounded bg-[#1c2830] hover:bg-[#152026] text-[#8ae088] hover:text-white border border-[#3b7180] text-[11px] font-bold flex items-center justify-center gap-2 transition-all shadow-sm">
+          <i class="fa-brands fa-android text-base text-[#8ae088]"></i>
+          <span>Download Android App</span>
+        </a>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-3 bg-[#244853] border-t border-[#2d5764] text-[11px] text-slate-300 flex items-center justify-between">
+        <button onclick="handleLogout()" class="text-rose-300 hover:text-white font-bold flex items-center gap-1 text-xs">
+          <i class="fa-solid fa-power-off"></i>
+          <span>Sign Out</span>
+        </button>
+        <span class="px-2 py-0.5 rounded bg-[#28b67a] text-white font-bold text-[10px]">CRM 2.0</span>
+      </div>
+    </aside>
+
+    <!-- ============================================================== -->
+    <!-- MAIN WORKSPACE AREA (#f2f5f7) -->
+    <!-- ============================================================== -->
+    <main class="flex-1 bg-[#f2f5f7] p-4 sm:p-6 overflow-y-auto">
+
+      <!-- Active Call Banner (Fixed top alert when in call) -->
+      <div id="activeCallBar" class="hidden mb-4 p-3 rounded bg-[#24333c] text-white border-l-4 border-[#28b67a] shadow-lg flex flex-wrap items-center justify-between gap-4 animate-fade-in">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded bg-[#28b67a] text-white flex items-center justify-center text-base ring-active">
+            <i class="fa-solid fa-phone-volume"></i>
+          </div>
+          <div>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-[#8ae088]">Live WebRTC Call</div>
+            <div class="text-base font-bold text-white flex items-center gap-2">
+              <span id="activeCallTarget">Unknown</span>
+              <span id="activeCallTimer" class="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">00:00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button id="callMuteBtn" onclick="toggleMute()" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-microphone"></i>
+            <span id="muteBtnText">Mute</span>
+          </button>
+          <button onclick="hangupCall()" class="px-4 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-phone-slash"></i>
+            <span>End Call</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="tab-dialer" class="tab-content">
+        <!-- Voicemail Pending Notification Alert Banner -->
+        <div id="vmDashboardBanner" class="hidden mb-4 p-3.5 rounded bg-gradient-to-r from-amber-50 to-amber-100/60 border border-amber-300 flex items-center justify-between shadow-sm">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-base border border-amber-300 animate-bounce">
+              <i class="fa-solid fa-voicemail"></i>
+            </div>
+            <div>
+              <span class="font-bold text-amber-900 block text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <i class="fa-solid fa-bell text-amber-600"></i>
+                <span>You Have Unread Voicemail Messages</span>
+              </span>
+              <span class="text-xs text-amber-800">There are <strong id="bannerVmUnreadCount" class="font-bold text-amber-900">0</strong> unread voicemail message(s) waiting for you.</span>
+            </div>
+          </div>
+          <button onclick="switchTab('voicemails')" class="px-3.5 py-1.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-play text-[10px]"></i> Listen Now
+          </button>
+        </div>
+
+        <!-- Admin Pending Top-up Requests Dashboard Banner -->
+        <div id="adminTopupDashboardBanner" class="hidden mb-4 p-3.5 rounded bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-2 border-amber-400 flex items-center justify-between shadow-md">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-lg shadow-sm animate-bounce">
+              <i class="fa-solid fa-bell"></i>
+            </div>
+            <div>
+              <span class="font-black text-amber-950 block text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <span>ACTION REQUIRED: CUSTOMER TOP-UP REQUESTS PENDING</span>
+              </span>
+              <span class="text-xs text-slate-800">There are <strong id="bannerPendingTopupCount" class="font-black text-amber-900 font-mono text-sm">0</strong> balance top-up request(s) waiting for verification and approval.</span>
+            </div>
+          </div>
+          <button onclick="switchTab('admin'); switchAdminSubtab('requests');" class="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 transition-all">
+            <i class="fa-solid fa-check-double text-xs"></i>
+            <span>Review & Approve Now</span>
+          </button>
+        </div>
+        
+        <!-- Module Header Title -->
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">WebRTC Softphone & Line Manager</h1>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="quickDial('*43')" class="px-3 py-1 rounded bg-[#366877] hover:bg-[#2d5764] text-white text-xs font-bold flex items-center gap-1 transition-colors">
+              <i class="fa-solid fa-bullhorn text-xs"></i> Echo Test (*43)
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          <!-- Dialer Softphone Card (Left 5 Cols) -->
+          <div class="lg:col-span-5 bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+            
+            <!-- Card Header (SuiteCRM Dark Slate #3b5a69) -->
+            <div class="bg-[#3b5a69] text-white px-4 py-2.5 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <div id="dialerIndicatorDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                <span id="dialerIndicatorText" class="text-xs font-bold uppercase tracking-wider">WebRTC Softphone</span>
+              </div>
+              <span id="dialFormatHint" class="text-[11px] text-slate-300 font-mono">UID or E.164</span>
+            </div>
+
+            <div class="p-5">
+              
+              <!-- Zero Balance Call Guard Alert Banner -->
+              <div id="zeroBalanceAlert" class="hidden mb-4 p-3 rounded bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+                  <div>
+                    <span class="font-bold">Balance Exhausted:</span> Outbound & internal calls blocked.
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-900 border border-rose-300">Recharge</span>
+              </div>
+
+              <!-- Dialer Screen Display -->
+              <div class="bg-[#f8fafb] border border-slate-300 rounded p-3 mb-4 shadow-inner">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex justify-between">
+                  <span>Destination Number</span>
+                  <span class="text-slate-400">DTMF Enabled</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <input type="text" id="dialInput" placeholder="Enter number..." 
+                         class="w-full bg-transparent font-mono text-2xl font-bold text-slate-900 focus:outline-none tracking-wider placeholder:text-slate-400">
+                  <button onclick="backspaceDial()" class="p-1.5 text-slate-400 hover:text-slate-700 transition-colors" title="Backspace">
+                    <i class="fa-solid fa-delete-left text-base"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- SuiteCRM Keypad Grid -->
+              <div class="grid grid-cols-3 gap-2.5 mb-5">
+                <button onclick="pressDigit('1')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">1</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">&nbsp;</div>
+                </button>
+                <button onclick="pressDigit('2')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">2</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">ABC</div>
+                </button>
+                <button onclick="pressDigit('3')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">3</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">DEF</div>
+                </button>
+                <button onclick="pressDigit('4')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">4</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">GHI</div>
+                </button>
+                <button onclick="pressDigit('5')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">5</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">JKL</div>
+                </button>
+                <button onclick="pressDigit('6')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">6</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">MNO</div>
+                </button>
+                <button onclick="pressDigit('7')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">7</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">PQRS</div>
+                </button>
+                <button onclick="pressDigit('8')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">8</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">TUV</div>
+                </button>
+                <button onclick="pressDigit('9')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">9</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">WXYZ</div>
+                </button>
+                <button onclick="pressDigit('*')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">*</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">&nbsp;</div>
+                </button>
+                <button onclick="pressDigit('0')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">0</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">+</div>
+                </button>
+                <button onclick="pressDigit('#')" class="dial-btn p-3 rounded bg-white hover:bg-slate-100 border border-slate-300 shadow-sm text-center">
+                  <div class="text-lg font-bold text-slate-800">#</div>
+                  <div class="text-[9px] text-slate-400 font-semibold tracking-widest">&nbsp;</div>
+                </button>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center space-x-2 mb-4">
+                <button id="mainCallBtn" onclick="initiateCall()" class="flex-1 py-3 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-sm shadow flex items-center justify-center space-x-2 transition-colors">
+                  <i class="fa-solid fa-phone"></i>
+                  <span>Audio Call</span>
+                </button>
+                <button onclick="clearDial()" class="px-4 py-3 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors" title="Clear">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+              </div>
+
+              <!-- SIP Gateway Selector -->
+              <div class="p-3 rounded bg-[#f8fafb] border border-slate-300 text-xs space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">SIP Gateway Endpoint</span>
+                  <div class="flex items-center space-x-2 text-[11px]">
+                    <button onclick="reconnectWebRTC()" class="text-[#366877] hover:text-[#24333c] font-bold flex items-center gap-1">
+                      <i class="fa-solid fa-arrow-rotate-right text-[10px]"></i> Reconnect
+                    </button>
+                    <span class="text-slate-400">|</span>
+                    <button onclick="disconnectWebRTC()" class="text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1">
+                      <i class="fa-solid fa-plug-circle-xmark text-[10px]"></i> Disconnect
+                    </button>
+                  </div>
+                </div>
+                <select id="wsUrlSelect" onchange="changeWsEndpoint()" class="w-full bg-white border border-slate-300 rounded px-2.5 py-1 text-xs text-slate-800 font-mono focus:outline-none focus:border-[#28b67a]">
+                  <option value="proxy">⚡ Portal Proxy: /ws (Safe for all browsers)</option>
+                  <option value="direct_wss">🔒 Direct Asterisk: wss://192.168.88.47:8089/ws</option>
+                  <option value="direct_ws">🌐 Direct Asterisk Plain: ws://192.168.88.47:8088/ws</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- CRM Account & Active Line Profile (Right 7 Cols) -->
+          <div class="lg:col-span-7 space-y-5">
+            
+            <!-- 1. Active Subscriber Profile Card -->
+            <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+              <div class="bg-[#3b5a69] text-white px-4 py-2.5 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <i class="fa-solid fa-id-card text-[#8ae088]"></i>
+                  <span class="text-xs font-bold uppercase tracking-wider">Active Subscriber Profile</span>
+                </div>
+                <span id="cardLineBadge" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#8ae088] text-[#1c2830] flex items-center gap-1 shadow-sm">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse"></span> Line Ready
+                </span>
+              </div>
+              
+              <div class="p-5">
+                <!-- User Banner Row: Avatar, Name, User ID, and Large Balance -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+                  <div class="flex items-center space-x-3.5">
+                    <div id="cardUserAvatar" class="w-12 h-12 rounded-full bg-[#366877] text-white flex items-center justify-center font-black text-xl shadow-inner border-2 border-slate-200">
+                      U
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h3 id="cardUserName" class="text-lg font-black text-slate-900 leading-tight">User Name</h3>
+                        <span id="cardUserRoleBadge" class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">Active Subscriber</span>
+                      </div>
+                      <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                        <span class="font-mono font-bold text-[#1d68d8] bg-blue-50 px-2 py-0.5 rounded border border-blue-200" id="cardUserExtBadge">User ID (UID): --</span>
+                        <span id="cardUserEmail" class="text-slate-500 font-mono text-[11px] flex items-center gap-1"><i class="fa-regular fa-envelope text-slate-400"></i> user@example.com</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Real Wallet Balance Card with Quick Add Funds Action -->
+                  <div class="w-full sm:w-auto text-left sm:text-right bg-emerald-50 sm:bg-transparent p-3 sm:p-0 rounded border sm:border-0 border-emerald-200">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">Account Balance</span>
+                    <div id="cardUserBalance" class="text-2xl font-black font-mono text-emerald-600 leading-tight">$0.00</div>
+                    <button type="button" onclick="openTopupModal()" class="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#28b67a] hover:text-[#229c67] hover:underline">
+                      <i class="fa-solid fa-plus-circle"></i> Add Funds / Top-up
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Detailed Real Profile Metadata Grid: Phone, Address, Registration Date -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 text-xs">
+                  <div class="p-2.5 rounded bg-[#f8fafb] border border-slate-200 flex items-center space-x-2.5">
+                    <div class="w-7 h-7 rounded bg-blue-100 text-blue-700 flex items-center justify-center text-xs shrink-0">
+                      <i class="fa-solid fa-phone"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                      <span class="text-[10px] uppercase font-bold text-slate-500 block">Contact Phone Number</span>
+                      <div id="cardUserPhone" class="font-mono font-bold text-slate-800 truncate">Not Provided</div>
+                    </div>
+                  </div>
+
+                  <div class="p-2.5 rounded bg-[#f8fafb] border border-slate-200 flex items-center space-x-2.5">
+                    <div class="w-7 h-7 rounded bg-purple-100 text-purple-700 flex items-center justify-center text-xs shrink-0">
+                      <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                      <span class="text-[10px] uppercase font-bold text-slate-500 block">Registered Since</span>
+                      <div id="cardUserRegDate" class="font-bold text-slate-800 truncate">--</div>
+                    </div>
+                  </div>
+
+                  <div class="sm:col-span-2 p-2.5 rounded bg-[#f8fafb] border border-slate-200 flex items-center space-x-2.5">
+                    <div class="w-7 h-7 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-xs shrink-0">
+                      <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div class="overflow-hidden">
+                      <span class="text-[10px] uppercase font-bold text-slate-500 block">Billing / Registered Address</span>
+                      <div id="cardUserAddress" class="font-medium text-slate-800 truncate">Not Provided</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Telephony Routing KPI Summary -->
+                <div class="grid grid-cols-3 gap-2.5 pt-3 text-center text-xs">
+                  <div class="p-2.5 rounded bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 block">Numbers Purchased</span>
+                    <div id="cardTotalDids" class="text-base font-black font-mono text-[#366877] mt-0.5">0</div>
+                    <span class="text-[9px] text-slate-400">Total Inbound DIDs</span>
+                  </div>
+                  <div class="p-2.5 rounded bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 block">SIP Forwarded</span>
+                    <div id="cardTotalSipForwarded" class="text-base font-black font-mono text-emerald-600 mt-0.5">0</div>
+                    <span class="text-[9px] text-slate-400">WebRTC Softphone</span>
+                  </div>
+                  <div class="p-2.5 rounded bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 block">PSTN Forwarded</span>
+                    <div id="cardTotalPstnForwarded" class="text-base font-black font-mono text-amber-600 mt-0.5">0</div>
+                    <span class="text-[9px] text-slate-400">Mobile / External</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Incoming Phone Numbers (DID) - Call Receiving Card -->
+            <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+              <div class="bg-[#24333c] text-white px-4 py-2.5 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <i class="fa-solid fa-globe text-[#8ae088]"></i>
+                  <span class="text-xs font-bold uppercase tracking-wider">Inbound WebRTC Phone Numbers (Softphone Lines)</span>
+                </div>
+                <button type="button" onclick="switchTab('marketplace')" class="text-[11px] font-bold text-[#8ae088] hover:text-white flex items-center gap-1 transition-colors">
+                  <i class="fa-solid fa-cart-plus"></i> Buy Inbound Number
+                </button>
+              </div>
+
+              <div class="p-4">
+                <!-- Dynamic List Container populated by app.js -->
+                <div id="subscriberIncomingDidsContainer" class="space-y-3">
+                  <div class="p-6 text-center text-slate-400 text-xs">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading incoming numbers...
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 2: NUMBER MARKETPLACE -->
+      <!-- ============================================================== -->
+      <div id="tab-marketplace" class="tab-content hidden">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">Phone Numbers & DIDs Marketplace</h1>
+            <p class="text-xs text-slate-500">Provision international and national telephone numbers directly to your line</p>
+          </div>
+          <button onclick="fetchAvailableDids()" class="px-3 py-1.5 rounded bg-[#366877] hover:bg-[#2d5764] text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-arrow-rotate-right"></i> Refresh Catalog
+          </button>
+        </div>
+
+        <!-- Filter & Pagination Bar (SuiteCRM Style) -->
+        <div class="bg-white border border-slate-300 rounded p-3 mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-slate-600 uppercase tracking-wider text-[11px]">Action:</span>
+            <button class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+              BULK ACTION ▾
+            </button>
+          </div>
+          <div class="flex items-center space-x-2 text-slate-600 font-medium">
+            <span>Showing Inventory</span>
+            <span class="font-mono font-bold text-[#1d68d8]">(1 - 10 of 10)</span>
+            <div class="flex items-center space-x-1">
+              <button class="px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed">◀</button>
+              <button class="px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-400 cursor-not-allowed">▶</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Marketplace Cards / Grid -->
+        <div id="marketplaceList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 3: DID FORWARDING & INBOUND ROUTING -->
+      <!-- ============================================================== -->
+      <div id="tab-routes" class="tab-content hidden">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">Inbound Call Routing & Forwarding</h1>
+            <p class="text-xs text-slate-500">Configure how incoming calls to your allocated phone numbers are handled</p>
+          </div>
+          <button onclick="fetchMyDids()" class="px-3 py-1.5 rounded bg-[#366877] hover:bg-[#2d5764] text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-arrow-rotate-right"></i> Refresh Routes
+          </button>
+        </div>
+
+        <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                  <th class="py-3 px-4 w-10 text-center"><input type="checkbox" class="rounded"></th>
+                  <th class="py-3 px-4">DID Number</th>
+                  <th class="py-3 px-4">Country</th>
+                  <th class="py-3 px-4">Forward Type</th>
+                  <th class="py-3 px-4">Destination Target</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="myDidsTableBody" class="divide-y divide-slate-200">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 4: CALL DETAIL RECORDS (CDRS) -->
+      <!-- ============================================================== -->
+      <div id="tab-cdrs" class="tab-content hidden">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">Call History & Detail Records (CDRs)</h1>
+            <p class="text-xs text-slate-500">Complete audit log of all inbound, internal, and outbound telephony calls</p>
+          </div>
+          <button onclick="fetchCdrs()" class="px-3 py-1.5 rounded bg-[#366877] hover:bg-[#2d5764] text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-arrow-rotate-right"></i> Refresh CDRs
+          </button>
+        </div>
+
+        <!-- SuiteCRM Table Action Bar -->
+        <div class="bg-white border border-slate-300 rounded p-3 mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-slate-600 uppercase tracking-wider text-[11px]">Bulk Action:</span>
+            <button class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+              BULK ACTION ▾
+            </button>
+          </div>
+          <div class="flex items-center space-x-2 text-slate-600 font-medium">
+            <span>Call Records</span>
+            <span class="font-mono font-bold text-[#1d68d8]">(1 - 50)</span>
+          </div>
+        </div>
+
+        <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                  <th class="py-3 px-4 w-10 text-center"><input type="checkbox" class="rounded"></th>
+                  <th class="py-3 px-4">Caller (From)</th>
+                  <th class="py-3 px-4">Destination (To)</th>
+                  <th class="py-3 px-4">Duration</th>
+                  <th class="py-3 px-4">Disposition</th>
+                  <th class="py-3 px-4">Cost ($)</th>
+                  <th class="py-3 px-4 text-right">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="cdrsTableBody" class="divide-y divide-slate-200">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 5: ADMINISTRATION PORTAL (Admin Only) -->
+      <!-- ============================================================== -->
+            <!-- ============================================================== -->
+      <!-- TAB: VOICEMAILS -->
+      <!-- ============================================================== -->
+      <div id="tab-voicemails" class="tab-content hidden">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-voicemail text-amber-600"></i>
+              <span>Customer Voicemail Messages</span>
+            </h1>
+            <p class="text-xs text-slate-500">Recordings left by callers when you are unavailable or unanswered on your DID numbers</p>
+          </div>
+          <button onclick="fetchVoicemails()" class="px-3 py-1.5 rounded bg-[#366877] hover:bg-[#2d5764] text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-arrow-rotate-right"></i> Refresh Voicemails
+          </button>
+        </div>
+
+        <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4">Caller (From)</th>
+                  <th class="py-3 px-4">DID Number</th>
+                  <th class="py-3 px-4">Duration</th>
+                  <th class="py-3 px-4 min-w-[280px]">Audio Player</th>
+                  <th class="py-3 px-4">Date & Time</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="voicemailsTableBody" class="divide-y divide-slate-200">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+            <!-- ========================================================== -->
+      <!-- TAB: CALL RATES & TALKTIME CALCULATOR                      -->
+      <!-- ========================================================== -->
+      <div id="tab-rates" class="tab-content hidden">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">Destination Rates & Talktime Guard</h1>
+            <p class="text-xs text-slate-500">View country calling charges and check your live available talktime before placing calls</p>
+          </div>
+          <button onclick="openTopupModal(event)" class="px-3.5 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-plus-circle"></i> Request Top-up
+          </button>
+        </div>
+
+        <!-- Talktime Calculator Card -->
+        <div class="bg-gradient-to-r from-[#24333c] to-[#366877] text-white rounded shadow-md p-5 mb-5">
+          <div class="flex flex-col md:flex-row items-center justify-between gap-5">
+            <div class="flex-1 w-full">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5 mb-1">
+                <i class="fa-solid fa-calculator"></i>
+                <span>Live Destination Talktime Estimator</span>
+              </span>
+              <p class="text-xs text-slate-200 mb-3">Enter any phone number or country code to check calling cost and how many minutes your balance allows:</p>
+              <div class="flex items-center gap-2 max-w-md">
+                <input type="text" id="calcDestinationInput" oninput="calculateTalktime()" placeholder="e.g. +923001234567, +442079460912, or 1..." 
+                       class="flex-1 px-3 py-2 rounded bg-white text-slate-900 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                <button onclick="calculateTalktime()" class="px-4 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1">
+                  <i class="fa-solid fa-bolt"></i> Check
+                </button>
+              </div>
+            </div>
+
+            <!-- Calculation Output Badge Box -->
+            <div id="calcResultBox" class="w-full md:w-80 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-4 text-xs space-y-2">
+              <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
+                <span class="text-slate-300">Destination:</span>
+                <span id="calcDestName" class="font-bold text-white">Default / Standard</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
+                <span class="text-slate-300">Rate / Minute:</span>
+                <span id="calcRatePerMin" class="font-mono font-bold text-emerald-300">$0.0150 / min</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-white/10 pb-1.5">
+                <span class="text-slate-300">Your Balance:</span>
+                <span id="calcCurrentBalance" class="font-mono font-bold text-white">$0.00</span>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-slate-300 font-bold">Estimated Talktime:</span>
+                <span id="calcEstTalktime" class="font-mono font-extrabold text-sm text-emerald-400">0 Mins</span>
+              </div>
+              <div id="calcStatusAlert" class="mt-2 py-1 px-2.5 rounded text-center font-bold text-[11px] bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                Insufficient Balance to Call
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rates Table Section -->
+        <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+          <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">All Destination Rates</span>
+              <button onclick="fetchRates()" class="px-2.5 py-1 rounded bg-slate-200 hover:bg-slate-300 font-bold text-slate-700">
+                <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+              </button>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="text" id="ratesSearchInput" oninput="filterRatesTable()" placeholder="Search country name or code..." 
+                     class="px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:border-[#28b67a] w-56">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                  <th class="py-3 px-4">Country / Destination</th>
+                  <th class="py-3 px-4 font-mono">Dial Code / Prefix</th>
+                  <th class="py-3 px-4">Rate Per Minute (USD)</th>
+                  <th class="py-3 px-4">Est. Talktime With Current Balance</th>
+                  <th class="py-3 px-4 text-center">Status</th>
+                  <th class="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="ratesTableBody" class="divide-y divide-slate-200">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-admin" class="tab-content hidden">
+        
+        <div id="adminMainHeader">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+          <div>
+            <h1 class="text-xl font-bold uppercase tracking-tight text-slate-800">Administration Console & User Management</h1>
+            <p class="text-xs text-slate-500">Manage all registered VoIP users, SIP passwords, balances, and Asterisk accounts</p>
+          </div>
+          <button onclick="openModalAddUser()" class="px-4 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white text-xs font-bold shadow flex items-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-user-plus"></i> Add New User
+          </button>
+        </div>
+
+        <!-- Top KPI Cards (SuiteCRM Style) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+          <div class="bg-white border border-slate-300 rounded p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Users</span>
+              <div id="adminStatTotalUsers" class="text-2xl font-black font-mono text-slate-900 mt-0.5">--</div>
+            </div>
+            <div class="w-10 h-10 rounded bg-[#366877]/10 text-[#366877] flex items-center justify-center text-lg">
+              <i class="fa-solid fa-users"></i>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-300 rounded p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Active UIDs</span>
+              <div id="adminStatActiveExt" class="text-2xl font-black font-mono text-[#1d68d8] mt-0.5">--</div>
+            </div>
+            <div class="w-10 h-10 rounded bg-blue-50 text-[#1d68d8] flex items-center justify-center text-lg">
+              <i class="fa-solid fa-phone"></i>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-300 rounded p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total System Balance</span>
+              <div id="adminStatTotalBalance" class="text-2xl font-black font-mono text-emerald-600 mt-0.5">$0.00</div>
+            </div>
+            <div class="w-10 h-10 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-300 rounded p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Numbers Allocated</span>
+              <div id="adminStatTotalDids" class="text-2xl font-black font-mono text-indigo-600 mt-0.5">--</div>
+            </div>
+            <div class="w-10 h-10 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-globe"></i>
+            </div>
+          </div>
+
+          <div onclick="switchAdminSubtab('requests')" class="bg-amber-50/70 border border-amber-300 hover:border-amber-400 rounded p-4 shadow-sm flex items-center justify-between cursor-pointer transition-all" title="Click to view requests">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-amber-900">Pending Top-ups</span>
+              <div id="adminStatPendingRequests" class="text-2xl font-black font-mono text-amber-700 mt-0.5">0</div>
+            </div>
+            <div class="w-10 h-10 rounded bg-amber-200 text-amber-800 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+            </div>
+          </div>
+        </div>
+        </div> <!-- END adminMainHeader -->
+
+        <div id="adminSubtab-users">
+        <!-- Filter & Search Bar -->
+        <div class="bg-white border border-slate-300 rounded p-3 mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-slate-600 uppercase tracking-wider text-[11px]">Action:</span>
+            <button class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+              BULK ACTION ▾
+            </button>
+            <button onclick="fetchAdminUsers()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+              <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Reload
+            </button>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input type="text" id="adminSearchInput" oninput="filterAdminUsers()" placeholder="Search name, email, UID..." 
+                   class="px-3 py-1.5 rounded border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:border-[#28b67a] w-56">
+          </div>
+        </div>
+
+        <!-- Users Data Table (Exact SuiteCRM Design) -->
+        <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                  <th class="py-3 px-4 w-10 text-center"><input type="checkbox" class="rounded"></th>
+                  <th class="py-3 px-4">UID / User ID</th>
+                  <th class="py-3 px-4">Full Name</th>
+                  <th class="py-3 px-4">Email Address</th>
+                  <th class="py-3 px-4">SIP Username</th>
+                  <th class="py-3 px-4">SIP Password (Secret)</th>
+                  <th class="py-3 px-4">Balance ($)</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4">Registered</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody" class="divide-y divide-slate-200">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </div>
+        <!-- END adminSubtab-users -->
+
+        <!-- ========================================================== -->
+        <!-- SUBTAB 2: ADMIN BALANCE TOP-UP REQUESTS                    -->
+        <!-- ========================================================== -->
+        <div id="adminSubtab-requests" class="hidden space-y-4">
+          <div class="bg-white border border-slate-300 rounded p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Customer Balance Top-up Requests</span>
+              <button onclick="fetchAdminBalanceRequests()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+                <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+              </button>
+            </div>
+            <div class="flex items-center space-x-2 text-slate-500">
+              <span class="text-[11px]">Filter:</span>
+              <select id="adminReqFilterStatus" onchange="filterAdminRequests()" class="px-2 py-1 rounded border border-slate-300 bg-white font-semibold">
+                <option value="all">All Requests</option>
+                <option value="pending" selected>Pending Only</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                    <th class="py-3 px-4">Req ID</th>
+                    <th class="py-3 px-4">Customer Name & Ext</th>
+                    <th class="py-3 px-4">Amount (USD)</th>
+                    <th class="py-3 px-4">Payment Method</th>
+                    <th class="py-3 px-4">Transaction Ref #</th>
+                    <th class="py-3 px-4">Notes</th>
+                    <th class="py-3 px-4">Date Submitted</th>
+                    <th class="py-3 px-4">Status</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRequestsTableBody" class="divide-y divide-slate-200">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- SUBTAB 3: ADMIN DESTINATION RATES MANAGEMENT               -->
+        <!-- ========================================================== -->
+        <div id="adminSubtab-rates" class="hidden space-y-4">
+          <!-- Add / Update Rate Card -->
+          <div class="bg-white border border-slate-300 rounded shadow-sm p-4 text-xs">
+            <h3 class="font-bold text-slate-800 uppercase tracking-wider text-xs mb-3 flex items-center gap-1.5">
+              <i class="fa-solid fa-plus-circle text-[#28b67a]"></i>
+              <span>Add or Update Destination Call Rate</span>
+            </h3>
+            <form onsubmit="handleSaveAdminRate(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Country / Destination Name</label>
+                <input type="text" id="adminRateCountryName" required placeholder="e.g. Pakistan Mobile" 
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Dialing Code / Prefix</label>
+                <input type="text" id="adminRateCountryCode" required placeholder="e.g. 92 or 1 or 44" 
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono text-slate-900 focus:outline-none focus:border-[#28b67a]">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Rate Per Minute ($ USD)</label>
+                <input type="number" step="0.0001" min="0.0001" id="adminRatePerMin" required placeholder="0.0450" 
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:outline-none focus:border-[#28b67a]">
+              </div>
+              <div class="flex items-end">
+                <button type="submit" class="w-full py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold shadow flex items-center justify-center gap-1.5 transition-colors">
+                  <i class="fa-solid fa-floppy-disk"></i>
+                  <span>Save Call Rate</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Rates List Table -->
+          <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Current Destination Rates</span>
+              <button onclick="fetchAdminRates()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+                <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                    <th class="py-3 px-4">Country Name</th>
+                    <th class="py-3 px-4 font-mono">Dial Code / Prefix</th>
+                    <th class="py-3 px-4 font-mono">Rate / Min (USD)</th>
+                    <th class="py-3 px-4 text-center">Status</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRatesTableBody" class="divide-y divide-slate-200">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- SUBTAB 4: ADMIN DID INVENTORY MANAGEMENT                   -->
+        <!-- ========================================================== -->
+        <div id="adminSubtab-dids" class="hidden space-y-4">
+          <!-- Inventory Table with Fast Search & Customer Lookup -->
+          <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">DID & Routing Management</span>
+                <button onclick="fetchAdminDids()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700 cursor-pointer">
+                  <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                </button>
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+              </div>
+              <div class="flex items-center flex-1 max-w-lg gap-2">
+                <div class="relative w-full">
+                  <input type="text" id="adminDidSearchInput" oninput="filterAdminDids()" placeholder="?? Search DID number (e.g. +1202, 4930), Customer, Email, Ext..." 
+                         class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-slate-900 text-xs font-semibold focus:outline-none focus:border-[#1d68d8] shadow-inner">
+                  <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-400"></i>
+                </div>
+                <select id="adminDidFilterStatus" onchange="filterAdminDids()" class="px-2.5 py-1.5 rounded border border-slate-300 bg-white font-semibold text-xs whitespace-nowrap">
+                  <option value="all">All Status</option>
+                  <option value="allocated" selected>Allocated / Active</option>
+                  <option value="available">Available in Store</option>
+                </select>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                    <th class="py-3 px-4">DID Phone Number</th>
+                    <th class="py-3 px-4">Country</th>
+                    <th class="py-3 px-4 font-mono">Cost / Month</th>
+                    <th class="py-3 px-4">Status</th>
+                    <th class="py-3 px-4">Assigned To (Customer)</th>
+                    <th class="py-3 px-4">Forward Destination</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminDidsTableBody" class="divide-y divide-slate-200">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- SUBTAB 5: ADMIN GLOBAL FINANCIAL LEDGER                    -->
+        <!-- ========================================================== -->
+        <div id="adminSubtab-ledger" class="hidden space-y-4">
+          <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">System Financial Statements & Audit Ledger</span>
+                <button onclick="fetchAdminGlobalLedger()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">
+                  <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+                </button>
+              </div>
+              <div class="flex items-center flex-1 max-w-lg gap-2">
+                <select id="adminLedgerFilterType" onchange="filterAdminGlobalLedger()" class="px-2.5 py-1.5 rounded border border-slate-300 bg-white font-semibold text-xs">
+                  <option value="all">All Transaction Types</option>
+                  <option value="TOPUP_CREDIT">Top-up Credits (+)</option>
+                  <option value="CALL_DEBIT">Outbound Call Charges (-)</option>
+                  <option value="DID_PURCHASE">DID Allocations (-)</option>
+                  <option value="ADMIN_ADJUSTMENT">Manual Adjustments</option>
+                </select>
+                <div class="relative w-full">
+                  <input type="text" id="adminLedgerSearchInput" oninput="filterAdminGlobalLedger()" placeholder="Search customer name, email, ext, description..." 
+                         class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-slate-900 text-xs font-semibold focus:outline-none focus:border-[#28b67a]">
+                  <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-400"></i>
+                </div>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-[#3b5a69] text-white uppercase text-[11px] font-bold tracking-wider">
+                    <th class="py-3 px-4">Date & Time</th>
+                    <th class="py-3 px-4">Customer</th>
+                    <th class="py-3 px-4">Type</th>
+                    <th class="py-3 px-4">Description / Particulars</th>
+                    <th class="py-3 px-4">Ref</th>
+                    <th class="py-3 px-4 text-right">Debit / Credit</th>
+                    <th class="py-3 px-4 text-right">Balance After</th>
+                  </tr>
+                </thead>
+                <tbody id="adminGlobalLedgerTableBody" class="divide-y divide-slate-200 font-mono">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtab 6: Customer 360 Profile & Financial Ledger (Inline on Same Page, NO POPUP) -->
+        <div id="adminSubtab-customer360" class="hidden space-y-4">
+          <!-- Top Breadcrumb & Back Bar -->
+          <div class="flex items-center justify-between bg-white border border-slate-300 rounded p-3 shadow-sm text-xs">
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="closeCustomer360Modal()" class="px-3.5 py-1.5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+                <i class="fa-solid fa-arrow-left text-slate-600"></i>
+                <span id="c360BackBtnText">Back to Previous View</span>
+              </button>
+              <span class="text-slate-300 font-bold">|</span>
+              <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-id-card-clip text-[#366877]"></i>
+                <span>Customer 360 Profile & Financial Ledger</span>
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 font-medium text-[11px]">Direct Route:</span>
+              <span id="c360TopHeaderBadge" class="font-mono font-bold bg-blue-50 text-[#1d68d8] px-2.5 py-0.5 rounded border border-blue-200">UID --</span>
+            </div>
+          </div>
+
+          <!-- Main Customer 360 Card (Full Width, Same Page) -->
+          <div class="bg-white border border-slate-300 rounded shadow-md overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-[#3b5a69] text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-700">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-slate-800/60 border border-slate-400 flex items-center justify-center text-lg text-emerald-400 shadow">
+            <i class="fa-solid fa-user-tie"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="c360Name" class="font-extrabold text-sm tracking-wide">Customer Name</h3>
+              <span id="c360RoleBadge" class="px-2 py-0.2 rounded text-[9px] font-black uppercase bg-purple-200 text-purple-900">User</span>
+              <span id="c360StatusBadge" class="px-2 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-200 text-emerald-900">Active</span>
+            </div>
+            <div class="text-[11px] text-slate-300 font-mono mt-0.5 flex items-center gap-3">
+              <span><i class="fa-solid fa-envelope mr-1 text-slate-400"></i><span id="c360Email">email@domain.com</span></span>
+              <span>?</span>
+              <span><i class="fa-solid fa-phone mr-1 text-blue-300"></i>UID: <strong id="c360Ext" class="text-white">2001</strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="text-right bg-slate-900/50 px-3 py-1 rounded border border-slate-600/60">
+            <span class="block text-[9px] uppercase font-bold text-slate-300 tracking-wider">Current Balance</span>
+            <span id="c360Balance" class="text-lg font-black font-mono text-emerald-400">$0.00</span>
+          </div>
+          <button onclick="closeCustomer360Modal()" class="text-slate-300 hover:text-white text-lg p-1"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs inside Customer 360 -->
+      <div class="flex border-b border-slate-200 bg-slate-100 text-xs font-bold px-4 pt-2 gap-1 overflow-x-auto">
+        <button id="c360TabBtn-overview" onclick="switchC360Tab('overview')" class="px-4 py-2 border-b-2 border-[#28b67a] text-slate-900 bg-white rounded-t flex items-center gap-1.5">
+          <i class="fa-solid fa-id-card text-[#366877]"></i>Profile & SIP
+        </button>
+        <button id="c360TabBtn-ledger" onclick="switchC360Tab('ledger')" class="px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-receipt text-emerald-600"></i>Financial Ledger
+        </button>
+        <button id="c360TabBtn-dids" onclick="switchC360Tab('dids')" class="px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-globe text-blue-600"></i>Allocated DIDs (<span id="c360DidsCount">0</span>)
+        </button>
+        <button id="c360TabBtn-cdrs" onclick="switchC360Tab('cdrs')" class="px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-phone text-indigo-600"></i>Call History (<span id="c360CdrsCount">0</span>)
+        </button>
+        <button id="c360TabBtn-voicemails" onclick="switchC360Tab('voicemails')" class="px-4 py-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-voicemail text-amber-600"></i>Voicemails (<span id="c360VmCount">0</span>)
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Overview & Balance Adjust -->
+      <div id="c360TabContent-overview" class="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Credentials Card -->
+          <div class="bg-white border border-slate-300 rounded p-4 shadow-sm space-y-3">
+            <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-slate-200 pb-2">
+              <i class="fa-solid fa-key text-[#1d68d8]"></i>
+              <span>SIP & Portal Credentials</span>
+            </h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                <span class="text-slate-500 font-semibold">WebRTC Line (UID):</span>
+                <span id="c360SipExtBadge" class="font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">2001</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                <span class="text-slate-500 font-semibold">SIP Secret / Password:</span>
+                <div class="flex items-center gap-1.5">
+                  <span id="c360SipSecret" class="font-mono font-bold text-slate-800">????????</span>
+                  <button type="button" onclick="toggleC360SecretVisibility()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <i id="c360SecretEye" class="fa-solid fa-eye-slash text-xs"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                <span class="text-slate-500 font-semibold">Contact Phone:</span>
+                <span id="c360Phone" class="font-mono font-semibold text-slate-700">--</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                <span class="text-slate-500 font-semibold">Registered Address:</span>
+                <span id="c360Address" class="font-medium text-slate-700 truncate max-w-[190px]">--</span>
+              </div>
+              <div class="flex justify-between items-center py-1 border-b border-slate-100">
+                <span class="text-slate-500 font-semibold">Registered On:</span>
+                <span id="c360RegisteredDate" class="font-mono text-slate-700">--</span>
+              </div>
+              <div class="flex justify-between items-center py-1">
+                <span class="text-slate-500 font-semibold">Account State:</span>
+                <span id="c360SipStateBadge" class="font-bold text-emerald-700">Active</span>
+              </div>
+            </div>
+            <div class="pt-2">
+              <button type="button" onclick="openEditUserFrom360()" class="w-full py-2 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold transition-colors flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-user-pen text-slate-600"></i>
+                <span>Edit Profile & Change Password</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Balance Adjustment Card -->
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-300 rounded p-4 shadow-sm space-y-3">
+            <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-scale-balanced text-emerald-600"></i>Balance Adjustment (Audit Recorded)</span>
+              <span id="c360CurrentBalWidget" class="font-mono font-black text-emerald-600 text-sm">$0.00</span>
+            </h4>
+            <form onsubmit="handleC360AdjustBalance(event)" class="space-y-3">
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center gap-1.5 p-2 rounded border border-slate-300 bg-white cursor-pointer font-bold text-emerald-700">
+                  <input type="radio" name="c360AdjustType" value="credit" checked class="text-emerald-600">
+                  <span>+ Credit (Add)</span>
+                </label>
+                <label class="flex items-center gap-1.5 p-2 rounded border border-slate-300 bg-white cursor-pointer font-bold text-rose-700">
+                  <input type="radio" name="c360AdjustType" value="debit" class="text-rose-600">
+                  <span>- Debit (Deduct)</span>
+                </label>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Adjustment Amount ($ USD)</label>
+                <input type="number" step="0.01" min="0.01" id="c360AdjustAmount" required placeholder="25.00" 
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono font-bold text-sm text-slate-900 focus:outline-none focus:border-[#28b67a]">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Audit Reason / Description</label>
+                <input type="text" id="c360AdjustReason" required placeholder="e.g. Approved Wire Transfer #789, Billing Correction" 
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+              </div>
+              <button type="submit" id="btnC360AdjustSubmit" class="w-full py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold shadow transition-colors flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Post Adjustment to Ledger</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Financial Ledger Statement -->
+      <div id="c360TabContent-ledger" class="hidden p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <!-- Summary KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-emerald-50 border border-emerald-200 rounded p-2.5">
+            <span class="block text-[10px] uppercase font-bold text-emerald-700">Total Top-ups (Credits)</span>
+            <span id="c360StatCredits" class="font-mono font-black text-emerald-800 text-base">+$0.00</span>
+          </div>
+          <div class="bg-rose-50 border border-rose-200 rounded p-2.5">
+            <span class="block text-[10px] uppercase font-bold text-rose-700">Call Charges (Debits)</span>
+            <span id="c360StatCalls" class="font-mono font-black text-rose-800 text-base">-$0.00</span>
+          </div>
+          <div class="bg-indigo-50 border border-indigo-200 rounded p-2.5">
+            <span class="block text-[10px] uppercase font-bold text-indigo-700">DID Purchases / Fees</span>
+            <span id="c360StatDids" class="font-mono font-black text-indigo-800 text-base">-$0.00</span>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 rounded p-2.5">
+            <span class="block text-[10px] uppercase font-bold text-blue-700">Net Current Balance</span>
+            <span id="c360StatBalance" class="font-mono font-black text-blue-800 text-base">$0.00</span>
+          </div>
+        </div>
+
+        <!-- Ledger Table -->
+        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <div class="p-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Financial Statement / Ledger</span>
+            <button onclick="printCustomerLedger()" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold text-xs flex items-center gap-1">
+              <i class="fa-solid fa-print"></i>Print Statement
+            </button>
+          </div>
+          <div class="overflow-x-auto max-h-72">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-[#3b5a69] text-white uppercase text-[10px] font-bold sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-3">Date & Time</th>
+                  <th class="py-2.5 px-3">Type</th>
+                  <th class="py-2.5 px-3">Description / Particulars</th>
+                  <th class="py-2.5 px-3">Ref</th>
+                  <th class="py-2.5 px-3 text-right">Amount ($)</th>
+                  <th class="py-2.5 px-3 text-right">Balance After</th>
+                </tr>
+              </thead>
+              <tbody id="c360LedgerTableBody" class="divide-y divide-slate-200 font-mono">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Allocated DIDs -->
+      <div id="c360TabContent-dids" class="hidden p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[#3b5a69] text-white uppercase text-[10px] font-bold">
+              <tr>
+                <th class="py-2.5 px-3">DID Number</th>
+                <th class="py-2.5 px-3">Country</th>
+                <th class="py-2.5 px-3">Cost / Mo</th>
+                <th class="py-2.5 px-3">Forward Type & Destination</th>
+                <th class="py-2.5 px-3">Voicemail</th>
+                <th class="py-2.5 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="c360DidsTableBody" class="divide-y divide-slate-200">
+              <!-- Dynamically loaded -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content 4: Call History (CDRs) -->
+      <div id="c360TabContent-cdrs" class="hidden p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[#3b5a69] text-white uppercase text-[10px] font-bold">
+              <tr>
+                <th class="py-2.5 px-3">Date & Time</th>
+                <th class="py-2.5 px-3">Caller</th>
+                <th class="py-2.5 px-3">Destination</th>
+                <th class="py-2.5 px-3">Duration</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3 text-right">Cost ($)</th>
+              </tr>
+            </thead>
+            <tbody id="c360CdrsTableBody" class="divide-y divide-slate-200 font-mono">
+              <!-- Dynamically loaded -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content 5: Voicemails -->
+      <div id="c360TabContent-voicemails" class="hidden p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div class="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[#3b5a69] text-white uppercase text-[10px] font-bold">
+              <tr>
+                <th class="py-2.5 px-3">Date & Time</th>
+                <th class="py-2.5 px-3">DID Number</th>
+                <th class="py-2.5 px-3">Caller ID</th>
+                <th class="py-2.5 px-3">Duration</th>
+                <th class="py-2.5 px-3">Audio Recording</th>
+              </tr>
+            </thead>
+            <tbody id="c360VmTableBody" class="divide-y divide-slate-200">
+              <!-- Dynamically loaded -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODALS (SuiteCRM Professional Design) -->
+  <!-- ============================================================== -->
+
+  <!-- 1. Incoming Call Modal -->
+  <div id="incomingCallModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl p-6 max-w-sm w-full text-center">
+      <div class="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-[#28b67a] flex items-center justify-center text-2xl mb-3 ring-active">
+        <i class="fa-solid fa-phone-volume"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-900">Incoming WebRTC Call</h3>
+      <p id="incomingCallerId" class="text-sm font-mono font-bold text-[#1d68d8] mt-1">Unknown Caller</p>
+      <div class="grid grid-cols-2 gap-3 mt-6">
+        <button onclick="answerIncomingCall()" class="py-2.5 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow">
+          <i class="fa-solid fa-phone mr-1"></i> Answer
+        </button>
+        <button onclick="rejectIncomingCall()" class="py-2.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow">
+          <i class="fa-solid fa-phone-slash mr-1"></i> Reject
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Edit Route Modal (3-Option Configurable Routing) -->
+  <div id="routeModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-sm uppercase tracking-wider">Configure Inbound DID Delivery</h3>
+          <p class="text-[11px] text-slate-200">Deliver incoming calls to your Softphone, Mobile, or SIP IP</p>
+        </div>
+        <button type="button" onclick="closeRouteModal()" class="text-slate-300 hover:text-white text-base"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form onsubmit="saveRoute(event)" class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="routeModalUserDidId">
+        <input type="hidden" id="routeModalDestination">
+
+        <!-- Selected DID Number Banner -->
+        <div class="p-3 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Selected Phone Number</span>
+            <span id="routeModalDidNumber" class="bg-[#1d68d8] text-white px-2.5 py-0.5 rounded font-mono font-bold text-sm inline-block mt-0.5">+1...</span>
+          </div>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">Instant Telephony Route</span>
+        </div>
+
+        <!-- 3 Forwarding Options -->
+        <div class="space-y-2.5">
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Select Where to Receive Incoming Calls</label>
+
+          <!-- OPTION 1: Local WebRTC Extension -->
+          <div onclick="selectRouteMode('EXTENSION')" id="routeCard-EXTENSION" class="p-3.5 rounded border border-[#28b67a] bg-emerald-50/50 cursor-pointer transition-all shadow-sm">
+            <div class="flex items-start space-x-3">
+              <input type="radio" name="routeMode" id="routeRadio-EXTENSION" value="EXTENSION" checked class="mt-0.5 text-[#28b67a] focus:ring-[#28b67a]">
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-headset text-[#28b67a]"></i>
+                    <span>Receive on My WebRTC Softphone (UID <span id="routeModalMyExt" class="font-mono text-[#1d68d8]">2001</span>)</span>
+                  </span>
+                  <span class="text-[10px] font-bold text-[#1f9260] bg-emerald-100 px-2 py-0.5 rounded">Incoming Ring</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">Incoming calls to this number will immediately ring your browser WebRTC softphone.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- OPTION 2: Mobile / PSTN Phone Number -->
+          <div onclick="selectRouteMode('PSTN')" id="routeCard-PSTN" class="p-3.5 rounded border border-slate-300 bg-white cursor-pointer transition-all hover:border-amber-400">
+            <div class="flex items-start space-x-3">
+              <input type="radio" name="routeMode" id="routeRadio-PSTN" value="PSTN" class="mt-0.5 text-amber-500 focus:ring-amber-500">
+              <div class="flex-1">
+                <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-solid fa-mobile-screen text-amber-600"></i>
+                  <span>Forward to Mobile / PSTN Phone Number</span>
+                </span>
+                <p class="text-[11px] text-slate-500 mt-1">Incoming calls will be forwarded over the telecom network to an external phone number.</p>
+                <div id="routePstnField" class="hidden mt-2.5">
+                  <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">Mobile or Landline Number (with country code)</label>
+                  <input type="text" id="routeInputPstn" placeholder="e.g. +12025550199 or 03001234567" 
+                         class="w-full px-3 py-2 border border-slate-300 rounded font-mono text-slate-900 text-xs focus:outline-none focus:border-amber-500">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OPTION 3: External SIP IP / PBX -->
+          <div onclick="selectRouteMode('SIP_IP')" id="routeCard-SIP_IP" class="p-3.5 rounded border border-slate-300 bg-white cursor-pointer transition-all hover:border-indigo-400">
+            <div class="flex items-start space-x-3">
+              <input type="radio" name="routeMode" id="routeRadio-SIP_IP" value="SIP_IP" class="mt-0.5 text-indigo-600 focus:ring-indigo-600">
+              <div class="flex-1">
+                <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-solid fa-network-wired text-indigo-600"></i>
+                  <span>Forward to External SIP IP Address / PBX</span>
+                </span>
+                <p class="text-[11px] text-slate-500 mt-1">Incoming calls will be forwarded to your remote SIP switch, PBX, or SIP IP address.</p>
+                <div id="routeSipIpField" class="hidden mt-2.5">
+                  <label class="block font-bold text-slate-600 uppercase text-[10px] mb-1">SIP IP Address or URI</label>
+                  <input type="text" id="routeInputSipIp" placeholder="e.g. 192.168.88.88:5060 or sip:reception@myoffice.com" 
+                         class="w-full px-3 py-2 border border-slate-300 rounded font-mono text-slate-900 text-xs focus:outline-none focus:border-indigo-500">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+                <!-- Voicemail Settings -->
+        <div id="routeVoicemailBox" class="p-3.5 rounded border border-amber-300 bg-amber-50/70 space-y-2 transition-all">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center space-x-2 cursor-pointer font-bold text-slate-800 text-[11px]">
+              <input type="checkbox" id="routeVoicemailEnabled" checked class="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-voicemail text-amber-600"></i>
+                <span>Enable Voicemail if Not Available / Unanswered</span>
+              </span>
+            </label>
+            <span id="routeVoicemailBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 border border-amber-300">Audio Greeting + Beep</span>
+          </div>
+          <p id="routeVoicemailNote" class="text-[11px] text-slate-600 pl-6">
+            If you do not answer within the timeout (or phone is offline), caller hears an audio prompt, records a voicemail message after the beep, and it is saved to your portal.
+          </p>
+          <div id="voicemailTimeoutContainer" class="flex items-center space-x-2 pl-6 pt-1 text-slate-700">
+            <span class="text-[11px] font-semibold">Answer after timeout:</span>
+            <select id="routeVoicemailTimeout" class="px-2.5 py-1 rounded border border-slate-300 bg-white font-semibold text-xs focus:outline-none focus:border-amber-500">
+              <option value="15">15 Seconds (approx 3 rings)</option>
+              <option value="20" selected>20 Seconds (approx 4 rings)</option>
+              <option value="30">30 Seconds (approx 6 rings)</option>
+              <option value="45">45 Seconds (approx 9 rings)</option>
+              <option value="0">Immediately (Always Voicemail / DND)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-200">
+          <span class="text-[11px] text-slate-500"><i class="fa-solid fa-bolt text-[#28b67a] mr-1"></i>Asterisk dialplan auto-syncs instantly</span>
+          <div class="flex space-x-2">
+            <button type="button" onclick="closeRouteModal()" class="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold">Cancel</button>
+            <button type="submit" id="btnSaveRouteSubmit" class="px-5 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold shadow flex items-center gap-1.5">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Save & Apply Route</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Add User Modal -->
+  <div id="modalAddUser" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider">Create New Customer & UID</h3>
+        <button onclick="closeModalAddUser()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleCreateUser(event)" class="p-5 space-y-3.5 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Full Name</label>
+          <input type="text" id="addUserName" required placeholder="e.g. Kristin Schaal" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Email Address</label>
+          <input type="email" id="addUserEmail" required placeholder="kristin@example.com" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Portal & SIP Password</label>
+          <input type="password" id="addUserPassword" required placeholder="••••••••" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Initial Balance ($)</label>
+            <input type="number" id="addUserBalance" step="0.50" value="10.00" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Status</label>
+            <select id="addUserStatus" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 bg-white">
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="addUserIsAdmin" class="rounded">
+          <label for="addUserIsAdmin" class="font-bold text-slate-700">Grant Administrator Role</label>
+        </div>
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+          <button type="button" onclick="closeModalAddUser()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold">Cancel</button>
+          <button type="submit" id="btnAddUserSubmit" class="px-4 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Edit User Modal -->
+  <div id="modalEditUser" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-user-pen"></i>
+          <span>Edit Customer & UID Profile</span>
+        </h3>
+        <button type="button" onclick="closeEditUserModal()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="submitEditUser(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="editUserId">
+
+        <div class="flex items-center justify-between p-2.5 rounded bg-slate-100 border border-slate-200">
+          <div>
+            <span class="font-bold text-slate-700 uppercase block text-[10px]">Account UID</span>
+            <span id="editUserExtensionBadge" class="font-mono font-bold text-sm text-[#1d68d8]">UID --</span>
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">WebRTC Line</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Full Name</label>
+            <input type="text" id="editUserName" required class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Email Address</label>
+            <input type="email" id="editUserEmail" required class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Contact Phone</label>
+            <input type="text" id="editUserPhone" placeholder="+1..." class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Billing / Registered Address</label>
+            <input type="text" id="editUserAddress" placeholder="Street, City, Country" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+            <span>SIP & Portal Login Password</span>
+            <span class="text-[10px] font-normal text-slate-500">(Leave blank to keep current)</span>
+          </label>
+          <div class="relative">
+            <input type="text" id="editUserSipPass" placeholder="Enter new password to change..." class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono text-xs focus:outline-none focus:border-[#28b67a]">
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">Changing password updates Portal login, Kamailio WebRTC Softphone, and Asterisk PJSIP automatically.</p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Balance ($)</label>
+            <input type="number" step="0.01" id="editUserBalance" required class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono font-bold focus:outline-none focus:border-[#28b67a]">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Account Status</label>
+            <select id="editUserStatus" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 bg-white focus:outline-none">
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+          <div class="flex items-center pt-5">
+            <label class="flex items-center space-x-2 cursor-pointer font-bold text-slate-700">
+              <input type="checkbox" id="editUserIsAdmin" class="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500">
+              <span>Admin Role</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+          <button type="button" onclick="closeEditUserModal()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold hover:bg-slate-300">Cancel</button>
+          <button type="submit" id="btnEditUserSubmit" class="px-5 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. Update Balance Modal -->
+  <div id="modalUpdateBalance" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-sm w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider">Top-up / Adjust Balance</h3>
+        <button onclick="closeModalUpdateBalance()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleUpdateBalance(event)" class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="balanceUserId">
+        <div class="p-3 rounded bg-slate-100 border border-slate-200 flex items-center justify-between">
+          <span id="balanceModalUserName" class="font-bold text-slate-800">User</span>
+          <span id="balanceModalCurrentAmount" class="font-mono font-black text-emerald-600 text-base">$0.00</span>
+        </div>
+        <div>
+          <label id="balanceInputLabel" class="block font-bold text-slate-700 uppercase mb-1">Add Funds ($)</label>
+          <input type="number" id="balanceInputAmount" step="1.00" value="20.00" required class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono text-base font-bold">
+        </div>
+        <div id="balancePresetsSection" class="flex gap-2">
+          <button type="button" onclick="setPresetBalance(10)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold">+$10</button>
+          <button type="button" onclick="setPresetBalance(20)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold">+$20</button>
+          <button type="button" onclick="setPresetBalance(50)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold">+$50</button>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+          <button type="button" onclick="closeModalUpdateBalance()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold">Cancel</button>
+          <button type="submit" id="btnUpdateBalanceSubmit" class="px-4 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold">Update Balance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  
+  <!-- Customer Top-up Modal -->
+  <div id="modalCustomerTopup" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-wallet text-emerald-400"></i>
+            <span>Request Account Balance Top-up</span>
+          </h3>
+          <p class="text-[11px] text-slate-200">Submit payment details to add talktime funds to your account</p>
+        </div>
+        <button type="button" onclick="closeTopupModal()" class="text-slate-300 hover:text-white text-base"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <!-- Current Balance Banner -->
+        <div class="p-3 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Current Available Balance</span>
+            <span id="topupModalCurrentBal" class="font-mono font-black text-emerald-600 text-lg">$0.00</span>
+          </div>
+          <span class="text-[10px] font-semibold px-2.5 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+            Admin Approval System
+          </span>
+        </div>
+
+        <form id="formTopupRequest" onsubmit="submitTopupRequest(event)" class="space-y-3.5">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Top-up Amount (USD $)</label>
+            <input type="number" step="1.00" min="1" id="topupInputAmount" required value="20.00" 
+                   class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono text-base font-bold focus:outline-none focus:border-[#28b67a]">
+          </div>
+
+          <!-- Quick presets -->
+          <div class="flex gap-2">
+            <button type="button" onclick="setTopupPreset(10)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">+$10</button>
+            <button type="button" onclick="setTopupPreset(25)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">+$25</button>
+            <button type="button" onclick="setTopupPreset(50)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">+$50</button>
+            <button type="button" onclick="setTopupPreset(100)" class="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700">+$100</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 uppercase mb-1">Payment Method</label>
+              <select id="topupPaymentMethod" class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 bg-white focus:outline-none focus:border-[#28b67a]">
+                <option value="Bank Transfer">Bank Wire / Transfer</option>
+                <option value="JazzCash / EasyPaisa">JazzCash / EasyPaisa</option>
+                <option value="Crypto USDT">USDT / Crypto (TRC20)</option>
+                <option value="PayPal">PayPal</option>
+                <option value="Credit Card">Credit / Debit Card</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 uppercase mb-1">Transaction Ref / Receipt #</label>
+              <input type="text" id="topupTxRef" placeholder="e.g. TXN-984210" 
+                     class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 font-mono focus:outline-none focus:border-[#28b67a]">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Additional Notes / Bank Slip Details (Optional)</label>
+            <textarea id="topupNotes" rows="2" placeholder="Account title, deposit slip date, or notes for admin..." 
+                      class="w-full px-3 py-2 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#28b67a]"></textarea>
+          </div>
+
+          <div class="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+            <button type="button" onclick="closeTopupModal()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold hover:bg-slate-300">Close</button>
+            <button type="submit" id="btnSubmitTopup" class="px-5 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Submit Top-up Request</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Past Requests History Accordion / List -->
+        <div class="pt-3 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-slate-700 uppercase text-[11px]">My Top-up Requests History</span>
+            <button type="button" onclick="fetchMyBalanceRequests()" class="text-slate-500 hover:text-slate-800 text-[11px] font-semibold">
+              <i class="fa-solid fa-arrow-rotate-right mr-1"></i>Refresh
+                <button type="button" onclick="openModalAddDidInventory()" class="px-2.5 py-1 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold text-xs shadow flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="fa-solid fa-circle-plus"></i><span>Add Numbers</span>
+                </button>
+            </button>
+          </div>
+          <div class="max-h-40 overflow-y-auto border border-slate-200 rounded">
+            <table class="w-full text-left border-collapse text-[11px]">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-bold sticky top-0">
+                <tr>
+                  <th class="py-2 px-2.5">Date</th>
+                  <th class="py-2 px-2.5">Amount</th>
+                  <th class="py-2 px-2.5">Method</th>
+                  <th class="py-2 px-2.5">Ref #</th>
+                  <th class="py-2 px-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody id="myTopupHistoryBody" class="divide-y divide-slate-200 font-mono">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- 6. Customer 360? Profile & Financial Ledger Modal             -->
+
+  <!-- Modal Admin Edit Routing -->
+  <!-- Modal Add DID Numbers to Inventory -->
+  <div id="modalAddDidInventory" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-circle-plus text-[#8ae088]"></i>
+          <span>Add DID Numbers to Marketplace Inventory</span>
+        </h3>
+        <button type="button" onclick="closeModalAddDidInventory()" class="text-slate-300 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleAddAdminDids(event)" class="p-5 space-y-3.5 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1 text-[10px]">Country / Region</label>
+            <input type="text" id="adminDidCountry" required placeholder="e.g. United States or Pakistan" 
+                   class="w-full px-3 py-1.5 border border-slate-300 rounded text-slate-900 focus:outline-none focus:border-[#1d68d8]">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase mb-1 text-[10px]">Monthly Cost ($ USD)</label>
+            <input type="number" step="0.25" min="0" id="adminDidMonthlyCost" required value="2.50" 
+                   class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:outline-none focus:border-[#1d68d8]">
+          </div>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1 text-[10px]">
+            DID Number(s) (Single number or paste multiple separated by newline or comma)
+          </label>
+          <textarea id="adminDidNumbers" required rows="3" placeholder="+12025550199&#10;+12025550200&#10;+442079460111" 
+                    class="w-full px-3 py-2 border border-slate-300 rounded font-mono text-slate-900 focus:outline-none focus:border-[#1d68d8]"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <button type="button" onclick="closeModalAddDidInventory()" class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold text-slate-700 cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-1.5 rounded bg-[#1d68d8] hover:bg-blue-700 text-white font-bold shadow flex items-center gap-1.5 transition-colors cursor-pointer">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Add Numbers to Inventory</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modalAdminEditRouting" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-md w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-route text-indigo-400"></i>
+          <span>Edit DID Call Routing & Voicemail</span>
+        </h3>
+        <button onclick="closeAdminEditRoutingModal()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleAdminSubmitRouting(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="adminRoutingDidId">
+        <div class="p-2.5 rounded bg-slate-100 border border-slate-200 flex justify-between items-center">
+          <span class="text-slate-600 font-bold uppercase text-[10px]">DID Number</span>
+          <span id="adminRoutingDidNumberBadge" class="font-mono font-bold text-sm text-[#1d68d8]">+1...</span>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Routing Mode</label>
+          <select id="adminRoutingForwardType" class="w-full px-3 py-2 border border-slate-300 rounded font-semibold text-slate-900 bg-white">
+            <option value="SIP_URI">Internal WebRTC Softphone (SIP URI / UID)</option>
+            <option value="PSTN">External Telephone Number (PSTN Forwarding)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Forwarding Destination</label>
+          <input type="text" id="adminRoutingForwardDest" required placeholder="e.g. 2013 or +12025550199" 
+                 class="w-full px-3 py-2 border border-slate-300 rounded font-mono font-bold text-slate-900 text-xs focus:outline-none focus:border-[#28b67a]">
+        </div>
+        <div class="p-3 bg-amber-50/70 border border-amber-200 rounded space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
+            <input type="checkbox" id="adminRoutingVoicemail" class="w-4 h-4 text-emerald-600 rounded">
+            <span>Enable Voicemail (Record Caller Voice)</span>
+          </label>
+          <div>
+            <label class="block font-semibold text-slate-600 text-[10px] mb-0.5">Ring Duration before Voicemail (seconds):</label>
+            <input type="number" min="5" max="120" id="adminRoutingVmTimeout" value="20" 
+                   class="w-24 px-2 py-1 border border-slate-300 rounded font-mono font-bold text-xs">
+          </div>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+          <button type="button" onclick="closeAdminEditRoutingModal()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold hover:bg-slate-300">Cancel</button>
+          <button type="submit" id="btnAdminRoutingSubmit" class="px-4 py-2 rounded bg-[#28b67a] hover:bg-[#229c67] text-white font-bold flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Save & Apply Route</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Admin Assign DID -->
+  <div id="modalAdminAssignDid" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white border border-slate-300 rounded shadow-2xl max-w-md w-full overflow-hidden">
+      <div class="bg-[#3b5a69] text-white px-4 py-3 flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-user-plus text-emerald-400"></i>
+          <span>Assign DID to Customer</span>
+        </h3>
+        <button onclick="closeAdminAssignDidModal()" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleAdminSubmitAssignDid(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="adminAssignDidId">
+        <div class="p-2.5 rounded bg-slate-100 border border-slate-200 flex justify-between items-center">
+          <div>
+            <span class="text-slate-500 block text-[10px] uppercase font-bold">DID Number</span>
+            <span id="adminAssignDidNumber" class="font-mono font-bold text-sm text-[#1d68d8]">+1...</span>
+          </div>
+          <span id="adminAssignDidCountry" class="text-slate-600 font-semibold text-xs">Country</span>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase mb-1">Select Customer</label>
+          <select id="adminAssignDidUserSelect" required class="w-full px-3 py-2 border border-slate-300 rounded font-semibold text-slate-900 bg-white">
+            <option value="">-- Choose Customer --</option>
+          </select>
+        </div>
+        <p class="text-[10px] text-slate-500">This DID will be immediately allocated to this customer and routed to their WebRTC UID line.</p>
+        <div class="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+          <button type="button" onclick="closeAdminAssignDidModal()" class="px-3 py-2 rounded bg-slate-200 text-slate-700 font-bold hover:bg-slate-300">Cancel</button>
+          <button type="submit" id="btnAdminAssignSubmit" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-check"></i>
+            <span>Confirm Assignment</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+    <!-- Toast Notification (SuiteCRM Style) -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-3 px-4 py-3 rounded bg-[#24333c] text-white border-l-4 border-[#28b67a] shadow-2xl text-xs font-bold">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-[#8ae088] text-base"></i>
+    <span id="toastText">Notification message</span>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="/app.js?v=20261105_v16_uid_clean"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          console.log('[PWA] ServiceWorker registered successfully:', reg.scope);
+        }).catch(function(err) {
+          console.log('[PWA] ServiceWorker registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

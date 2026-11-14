@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables & Sensitive keys
+.env
+*.pem
+*.key
+*.crt
+*.pfx
+
+# Logs
+*.log
+npm-debug.log*
+
+# Database & Archives
+*.sql.gz
+*.tar.gz
+*.zip
+*.bak*
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
